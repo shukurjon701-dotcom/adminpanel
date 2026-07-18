@@ -1,0 +1,27 @@
+# Конфигурация Fly.io. Имя приложения (app) должно быть уникальным на весь Fly —
+# при первом запуске "fly launch" может предложить своё; можно согласиться.
+app = "academy-arabic-bot"
+primary_region = "fra"   # Франкфурт; можно "waw" (Варшава) — ближе к Узбекистану
+
+[build]
+
+[env]
+  DB_PATH = "/data/academy_bot.db"
+  ADMIN_PORT = "8000"
+
+# Веб-панель доступна по HTTPS. Машину НЕ усыпляем, чтобы бот отвечал 24/7.
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+# Постоянный диск для базы academy_bot.db — данные переживают перезапуски.
+[mounts]
+  source = "academy_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"   # если будет не хватать памяти — поднимите до "512mb"
