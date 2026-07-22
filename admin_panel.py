@@ -113,7 +113,7 @@ DASHBOARD_HTML = """
 
   <section id="users" class="section">
     <table>
-      <thead><tr><th>Статус</th><th>Username</th><th>Имя</th><th>ID</th><th>Первый визит</th><th>Последний визит</th><th>Сообщений</th></tr></thead>
+      <thead><tr><th>Статус</th><th>Username</th><th>Телефон</th><th>Имя</th><th>ID</th><th>Первый визит</th><th>Последний визит</th><th>Сообщений</th></tr></thead>
       <tbody id="users-table"></tbody>
     </table>
   </section>
@@ -187,6 +187,7 @@ async function loadUsers() {
     <tr>
       <td><span class="dot ${u.online ? 'online' : 'offline'}"></span>${u.online ? 'Онлайн' : 'Оффлайн'}</td>
       <td>${u.username ? '@' + u.username : '—'}</td>
+      <td>${u.phone ? escapeHtml(u.phone) : '—'}</td>
       <td>${u.full_name || '—'}</td>
       <td>${u.telegram_id}</td>
       <td>${fmtDate(u.first_seen)}</td>

@@ -1,13 +1,19 @@
 import asyncio
 import logging
 import os
+import re
 from collections import defaultdict, deque
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram.types import (
+    Message,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardRemove,
+)
 from dotenv import load_dotenv
 from groq import Groq
 
@@ -187,6 +193,22 @@ def ask_groq(user_id: int, user_text: str) -> str:
     return answer
 
 
+# Кнопка запроса номера телефона (Telegram отдаёт реальный номер пользователя).
+CONTACT_KEYBOARD = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="📱 Telefon raqamni ulashish", request_contact=True)]],
+    resize_keyboard=True,
+    one_time_keyboard=True,
+)
+
+# Распознаём номер, если пользователь ввёл его текстом (а не кнопкой).
+PHONE_RE = re.compile(r"^\+?[\d\s\-()]{7,20}$")
+
+
+def looks_like_phone(text: str) -> bool:
+    text = text.strip()
+    return bool(PHONE_RE.match(text)) and sum(c.isdigit() for c in text) >= 7
+
+
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     log.info(f"➡️  /start от {message.from_user.full_name} (id={message.from_user.id}, @{message.from_user.username})")
@@ -194,12 +216,30 @@ async def cmd_start(message: Message):
     user_histories.pop(message.from_user.id, None)
     await message.answer(
         "Ассаляму алейкум! 👋\n\n"
-        "Я — ИИ-ассистент учебного центра <b>Academy of Arabic</b>.\n"
-        "Задайте вопрос о курсах, расписании, ценах или об арабском языке "
-        "— постараюсь помочь.\n\n"
-        "Команда /reset — начать диалог заново."
+        "Я — ИИ-ассистент учебного центра <b>Academy of Arabic</b>.\n\n"
+        "Iltimos, quyidagi tugma orqali telefon raqamingizni ulashing — "
+        "administrator siz bilan bog'lana olishi uchun. "
+        "Yoki raqamingizni shu yerga yozib yuboring.\n\n"
+        "(Пожалуйста, поделитесь номером телефона кнопкой ниже или напишите его "
+        "сообщением — чтобы администратор мог связаться с вами.)",
+        reply_markup=CONTACT_KEYBOARD,
     )
     log.info(f"✅  Приветствие отправлено пользователю id={message.from_user.id}")
+
+
+@dp.message(F.contact)
+async def handle_contact(message: Message):
+    """Пользователь поделился номером через кнопку."""
+    phone = message.contact.phone_number
+    db.upsert_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
+    db.set_user_phone(message.from_user.id, phone)
+    log.info(f"📱 Сохранён номер пользователя id={message.from_user.id}: {phone}")
+    await message.answer(
+        "Rahmat! Raqamingiz saqlandi ✅\n"
+        "Endi savolingizni yozishingiz mumkin.\n\n"
+        "(Спасибо, номер сохранён. Теперь можете задать вопрос.)",
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
 @dp.message(Command("reset"))
@@ -213,6 +253,17 @@ async def cmd_reset(message: Message):
 async def handle_text(message: Message):
     log.info(f"➡️  Сообщение от {message.from_user.full_name} (id={message.from_user.id}): {message.text!r}")
     db.upsert_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
+
+    # Если пользователь прислал номер телефона текстом — сохраняем и не гоняем в ИИ.
+    if looks_like_phone(message.text):
+        db.set_user_phone(message.from_user.id, message.text.strip())
+        log.info(f"📱 Сохранён номер (текстом) id={message.from_user.id}: {message.text.strip()}")
+        await message.answer(
+            "Rahmat! Raqamingiz saqlandi ✅\n\n(Спасибо, номер сохранён.)",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return
+
     await bot.send_chat_action(message.chat.id, "typing")
     try:
         answer = ask_groq(message.from_user.id, message.text)

@@ -70,11 +70,22 @@ def init_db():
                 telegram_id {big} UNIQUE NOT NULL,
                 username TEXT,
                 full_name TEXT,
+                phone TEXT,
                 first_seen TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
                 message_count INTEGER NOT NULL DEFAULT 0
             )
         """)
+        # Миграция: добавить колонку phone, если таблицу создали раньше без неё.
+        try:
+            if USE_PG:
+                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT")
+            else:
+                cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+                if "phone" not in cols:
+                    conn.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+        except Exception:
+            pass
         conn.execute(f"""
             CREATE TABLE IF NOT EXISTS messages (
                 id {pk},
@@ -115,6 +126,14 @@ def upsert_user(telegram_id: int, username: Optional[str], full_name: str):
             )
 
 
+def set_user_phone(telegram_id: int, phone: str):
+    with get_connection() as conn:
+        conn.execute(
+            _q("UPDATE users SET phone = ? WHERE telegram_id = ?"),
+            (phone, telegram_id),
+        )
+
+
 def log_message(telegram_id: int, username: Optional[str], text: str, answer: Optional[str]):
     now = _now()
     with get_connection() as conn:
@@ -152,7 +171,7 @@ def get_users(limit: int = 300) -> list:
     cutoff = (datetime.now(timezone.utc) - timedelta(minutes=ONLINE_WINDOW_MINUTES)).isoformat()
     with get_connection() as conn:
         rows = conn.execute(
-            _q("SELECT telegram_id, username, full_name, first_seen, last_seen, message_count "
+            _q("SELECT telegram_id, username, full_name, phone, first_seen, last_seen, message_count "
                "FROM users ORDER BY last_seen DESC LIMIT ?"),
             (limit,),
         ).fetchall()
@@ -162,6 +181,7 @@ def get_users(limit: int = 300) -> list:
             "telegram_id": r["telegram_id"],
             "username": r["username"],
             "full_name": r["full_name"],
+            "phone": r["phone"],
             "first_seen": r["first_seen"],
             "last_seen": r["last_seen"],
             "message_count": r["message_count"],
