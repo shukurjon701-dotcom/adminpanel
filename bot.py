@@ -15,9 +15,11 @@ import database as db
 
 load_dotenv()
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# .strip() убирает случайные пробелы/переносы строки по краям значения
+# (частая ошибка при копировании токена) — иначе aiogram ругается на пробелы.
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
 
 if not TELEGRAM_BOT_TOKEN or not GROQ_API_KEY:
     raise RuntimeError(

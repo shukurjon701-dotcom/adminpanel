@@ -16,10 +16,9 @@ import os
 
 import uvicorn
 
-# ВАЖНО: импорт bot и admin_panel исполняет их код верхнего уровня,
-# поэтому переменные окружения (TELEGRAM_BOT_TOKEN, GROQ_API_KEY и т.д.)
-# уже должны быть заданы к этому моменту.
-import bot
+# admin_panel импортируем сразу — он поднимает веб-панель (и держит порт).
+# bot импортируем ПОЗЖЕ, внутри run_bot(), чтобы ошибка в токене бота не
+# роняла веб-панель на этапе импорта.
 import admin_panel
 
 log = logging.getLogger("run_all")
@@ -45,6 +44,7 @@ async def run_bot():
     # TELEGRAM_BOT_TOKEN), мы логируем ошибку, но НЕ роняем веб-панель —
     # иначе Render не увидит открытый порт и сервис не поднимется.
     try:
+        import bot  # импорт здесь: ошибка токена не уронит веб-панель
         await bot.main()
     except Exception:
         log.exception(
