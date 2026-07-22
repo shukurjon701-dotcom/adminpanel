@@ -40,10 +40,24 @@ async def run_web_panel():
     await server.serve()
 
 
+async def run_bot():
+    # Бот запускается отдельной задачей. Если он упадёт (например, неверный
+    # TELEGRAM_BOT_TOKEN), мы логируем ошибку, но НЕ роняем веб-панель —
+    # иначе Render не увидит открытый порт и сервис не поднимется.
+    try:
+        await bot.main()
+    except Exception:
+        log.exception(
+            "❌ Бот остановился с ошибкой. Веб-панель продолжает работать. "
+            "Проверьте TELEGRAM_BOT_TOKEN и GROQ_API_KEY в разделе Environment."
+        )
+
+
 async def main():
+    # Веб-панель держит порт открытым 24/7; бот работает рядом независимо.
     await asyncio.gather(
         run_web_panel(),
-        bot.main(),
+        run_bot(),
     )
 
 
